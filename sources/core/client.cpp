@@ -71,8 +71,9 @@ namespace cpp_redis {
 			const connect_callback_t &connect_callback,
 			std::uint32_t timeout_ms,
 			std::int32_t max_reconnects,
-			std::uint32_t reconnect_interval_ms) {
-/**
+			std::uint32_t reconnect_interval_ms,
+			bool use_encryption) {
+ /**
  * Save for auto reconnects
  */
 		m_master_name = name;
@@ -94,7 +95,8 @@ namespace cpp_redis {
 			const connect_callback_t &connect_callback,
 			std::uint32_t timeout_ms,
 			std::int32_t max_reconnects,
-			std::uint32_t reconnect_interval_ms) {
+			std::uint32_t reconnect_interval_ms,
+			bool use_encryption) {
 		__CPP_REDIS_LOG(debug, "cpp_redis::client attempts to connect");
 
 /**
@@ -105,6 +107,7 @@ namespace cpp_redis {
 		m_connect_callback = connect_callback;
 		m_max_reconnects = max_reconnects;
 		m_reconnect_interval_ms = reconnect_interval_ms;
+		m_use_encryption = use_encryption;
 
 /**
  * notify start
@@ -114,9 +117,8 @@ namespace cpp_redis {
 		}
 
 		auto disconnection_handler = std::bind(&client::connection_disconnection_handler, this, std::placeholders::_1);
-		auto receive_handler = std::bind(&client::connection_receive_handler, this, std::placeholders::_1,
-		                                 std::placeholders::_2);
-		m_client.connect(host, port, disconnection_handler, receive_handler, timeout_ms);
+		auto receive_handler = std::bind(&client::connection_receive_handler, this, std::placeholders::_1, std::placeholders::_2);
+		m_client.connect(host, port, disconnection_handler, receive_handler, timeout_ms, use_encryption);
 
 		__CPP_REDIS_LOG(info, "cpp_redis::client connected");
 
@@ -161,8 +163,8 @@ namespace cpp_redis {
 	}
 
 	void
-	client::add_sentinel(const std::string &host, std::size_t port, std::uint32_t timeout_ms) {
-		m_sentinel.add_sentinel(host, port, timeout_ms);
+	client::add_sentinel(const std::string &host, std::size_t port, std::uint32_t timeout_ms, bool use_encryption) {
+		m_sentinel.add_sentinel(host, port, timeout_ms, use_encryption);
 	}
 
 	const sentinel &
@@ -442,7 +444,7 @@ namespace cpp_redis {
  * We rely on the sentinel to tell us which redis server is currently the master.
  */
 		if (!m_master_name.empty() &&
-		    !m_sentinel.get_master_addr_by_name(m_master_name, m_redis_server, m_redis_port, true)) {
+			!m_sentinel.get_master_addr_by_name(m_master_name, m_redis_server, m_redis_port, true)) {
 			if (m_connect_callback) {
 				m_connect_callback(m_redis_server, m_redis_port, connect_state::lookup_failed);
 			}
@@ -454,7 +456,7 @@ namespace cpp_redis {
  */
 		try {
 			connect(m_redis_server, m_redis_port, m_connect_callback, m_connect_timeout_ms, m_max_reconnects,
-			        m_reconnect_interval_ms);
+			m_reconnect_interval_ms, m_use_encryption);
 		}
 		catch (...) {
 		}
@@ -612,7 +614,7 @@ namespace cpp_redis {
 
 	client &
 	client::bitfield(const std::string &key, const std::vector<bitfield_operation> &operations,
-	                 const reply_callback_t &reply_callback) {
+					const reply_callback_t &reply_callback) {
 		std::vector<std::string> cmd = {"BITFIELD", key};
 
 		for (const auto &operation : operations) {
@@ -621,7 +623,7 @@ namespace cpp_redis {
 			cmd.push_back(std::to_string(operation.offset));
 
 			if (operation.operation_type == bitfield_operation_type::set ||
-			    operation.operation_type == bitfield_operation_type::incrby) {
+				operation.operation_type == bitfield_operation_type::incrby) {
 				cmd.push_back(std::to_string(operation.value));
 			}
 
@@ -637,7 +639,7 @@ namespace cpp_redis {
 
 	client &
 	client::bitop(const std::string &operation, const std::string &destkey, const std::vector<std::string> &keys,
-	              const reply_callback_t &reply_callback) {
+	             const reply_callback_t &reply_callback) {
 		std::vector<std::string> cmd = {"BITOP", operation, destkey};
 		cmd.insert(cmd.end(), keys.begin(), keys.end());
 		send(cmd, reply_callback);

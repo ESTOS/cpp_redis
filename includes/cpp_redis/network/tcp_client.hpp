@@ -55,9 +55,10 @@ public:
  * @param addr host to be connected to
  * @param port port to be connected to
  * @param timeout_ms max time to connect in ms
+ * @param use_encryption enables TLS when set to true
  *
  */
-  void connect(const std::string& addr, std::uint32_t port, std::uint32_t timeout_ms) override;
+  void connect(const std::string& addr, std::uint32_t port, std::uint32_t timeout_ms, bool use_encryption) override;
 
 /**
  * stop the tcp client
