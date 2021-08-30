@@ -327,7 +327,7 @@ namespace cpp_redis {
  * @param use_encryption enables TLS when set to true
  *
  */
-			void add_sentinel(const std::string &host, std::size_t port, std::uint32_t timeout_ms, bool use_encryption);
+			void add_sentinel(const std::string &host, std::size_t port, std::uint32_t timeout_ms = 0, bool use_encryption = false);
 
 /**
  * retrieve sentinel for current client

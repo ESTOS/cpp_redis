@@ -57,7 +57,7 @@ public:
  * @param timeout_ms max time to connect in ms
  * @param use_encryption enables TLS when set to true
  */
-  virtual void connect(const std::string& addr, std::uint32_t port, std::uint32_t timeout_ms, bool use_encryption) = 0;
+  virtual void connect(const std::string& addr, std::uint32_t port, std::uint32_t timeout_ms = 0, bool use_encryption = false) = 0;
 
 /**
  * stop the tcp client

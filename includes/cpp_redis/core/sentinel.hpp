@@ -152,7 +152,7 @@ namespace cpp_redis {
 			 * @return current instance
 			 *
 			 */
-			sentinel &add_sentinel(const std::string &host, std::size_t port, std::uint32_t timeout_ms, bool use_encryption);
+			sentinel &add_sentinel(const std::string &host, std::size_t port, std::uint32_t timeout_ms = 0, bool use_encryption = false);
 
 			/**
 			 * clear all existing sentinels.
