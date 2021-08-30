@@ -73,13 +73,14 @@ subscriber::connect(
   const connect_callback_t& connect_callback,
   std::uint32_t timeout_ms,
   std::int32_t max_reconnects,
-  std::uint32_t reconnect_interval_ms) {
+  std::uint32_t reconnect_interval_ms,
+  bool use_encryption) {
   //! Save for auto reconnects
   m_master_name = name;
 
   //! We rely on the sentinel to tell us which redis server is currently the master.
   if (m_sentinel.get_master_addr_by_name(name, m_redis_server, m_redis_port, true)) {
-    connect(m_redis_server, m_redis_port, connect_callback, timeout_ms, max_reconnects, reconnect_interval_ms);
+    connect(m_redis_server, m_redis_port, connect_callback, timeout_ms, max_reconnects, reconnect_interval_ms, use_encryption);
   }
   else {
     throw redis_error("cpp_redis::subscriber::connect() could not find master for m_name " + name);
@@ -93,7 +94,8 @@ subscriber::connect(
   const connect_callback_t& connect_callback,
   std::uint32_t timeout_ms,
   std::int32_t max_reconnects,
-  std::uint32_t reconnect_interval_ms) {
+  std::uint32_t reconnect_interval_ms,
+  bool use_encryption) {
   __CPP_REDIS_LOG(debug, "cpp_redis::subscriber attempts to connect");
 
   //! Save for auto reconnects
@@ -101,7 +103,8 @@ subscriber::connect(
   m_redis_port               = port;
   m_connect_callback         = connect_callback;
   m_max_reconnects           = max_reconnects;
-  m_reconnect_interval_ms = reconnect_interval_ms;
+  m_reconnect_interval_ms    = reconnect_interval_ms;
+  m_use_encryption           = use_encryption;
 
   //! notify start
   if (m_connect_callback) {
@@ -110,7 +113,7 @@ subscriber::connect(
 
   auto disconnection_handler = std::bind(&subscriber::connection_disconnection_handler, this, std::placeholders::_1);
   auto receive_handler       = std::bind(&subscriber::connection_receive_handler, this, std::placeholders::_1, std::placeholders::_2);
-  m_client.connect(host, port, disconnection_handler, receive_handler, timeout_ms);
+  m_client.connect(host, port, disconnection_handler, receive_handler, timeout_ms, use_encryption);
 
   //! notify end
   if (m_connect_callback) {
@@ -121,8 +124,8 @@ subscriber::connect(
 }
 
 void
-subscriber::add_sentinel(const std::string& host, std::size_t port, std::uint32_t timeout_ms) {
-  m_sentinel.add_sentinel(host, port, timeout_ms);
+subscriber::add_sentinel(const std::string& host, std::size_t port, std::uint32_t timeout_ms, bool use_encryption) {
+  m_sentinel.add_sentinel(host, port, timeout_ms, use_encryption);
 }
 
 const sentinel&
@@ -485,7 +488,7 @@ subscriber::reconnect() {
 
   //! Try catch block because the redis subscriber throws an error if connection cannot be made.
   try {
-    connect(m_redis_server, m_redis_port, m_connect_callback, m_connect_timeout_ms, m_max_reconnects, m_reconnect_interval_ms);
+    connect(m_redis_server, m_redis_port, m_connect_callback, m_connect_timeout_ms, m_max_reconnects, m_reconnect_interval_ms, m_use_encryption);
   }
   catch (...) {
   }

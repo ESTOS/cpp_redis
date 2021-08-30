@@ -102,6 +102,8 @@ namespace cpp_redis {
  * @param disconnection_handler handler to be called in case of disconnection
  * @param reply_callback handler to be called once a reply is ready
  * @param timeout_ms max time to connect (in ms)
+ * @param use_encryption enables TLS when set to true
+ * 
  *
  */
 				void connect(
@@ -109,7 +111,7 @@ namespace cpp_redis {
 						std::size_t port = 6379,
 						const disconnection_handler_t &disconnection_handler = nullptr,
 						const reply_callback_t &reply_callback = nullptr,
-						std::uint32_t timeout_ms = 0);
+						std::uint32_t timeout_ms = 0, bool use_encryption = false);
 
 /**
  * disconnect from redis server

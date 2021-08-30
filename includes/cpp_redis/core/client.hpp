@@ -111,6 +111,7 @@ namespace cpp_redis {
 			 * @param timeout_ms maximum time to connect
 			 * @param max_reconnects maximum attempts of reconnection if connection dropped
 			 * @param reconnect_interval_ms time between two attempts of reconnection
+			 * @param use_encryption enables TLS when set to true
 			 *
 			 */
 			void connect(
@@ -119,7 +120,8 @@ namespace cpp_redis {
 					const connect_callback_t &connect_callback = nullptr,
 					std::uint32_t timeout_ms = 0,
 					std::int32_t max_reconnects = 0,
-					std::uint32_t reconnect_interval_ms = 0);
+					std::uint32_t reconnect_interval_ms = 0,
+					bool use_encryption = false);
 
 			/**
 			 * Connect to redis server
@@ -136,7 +138,8 @@ namespace cpp_redis {
 					const connect_callback_t &connect_callback = nullptr,
 					std::uint32_t timeout_ms = 0,
 					std::int32_t max_reconnects = 0,
-					std::uint32_t reconnect_interval_ms = 0);
+					std::uint32_t reconnect_interval_ms = 0,
+					bool use_encryption = false);
 
 			/**
 			 * @return whether we are connected to the redis server
@@ -321,9 +324,10 @@ namespace cpp_redis {
  * @param host sentinel host
  * @param port sentinel port
  * @param timeout_ms maximum time to connect
+ * @param use_encryption enables TLS when set to true
  *
  */
-			void add_sentinel(const std::string &host, std::size_t port, std::uint32_t timeout_ms = 0);
+			void add_sentinel(const std::string &host, std::size_t port, std::uint32_t timeout_ms = 0, bool use_encryption = false);
 
 /**
  * retrieve sentinel for current client
@@ -2321,6 +2325,11 @@ namespace cpp_redis {
 			std::uint32_t m_reconnect_interval_ms = 0;
 
 /**
+ * use encryption
+ *
+ */
+			bool m_use_encryption = false;
+ /**
  * reconnection status
  *
  */

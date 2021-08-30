@@ -56,14 +56,14 @@ namespace cpp_redis {
 		redis_connection::connect(const std::string &host, std::size_t port,
 		                          const disconnection_handler_t &client_disconnection_handler,
 		                          const reply_callback_t &client_reply_callback,
-		                          std::uint32_t timeout_ms) {
+		                          std::uint32_t timeout_ms, bool use_encryption) {
 			try {
 				__CPP_REDIS_LOG(debug, "cpp_redis::network::redis_connection attempts to connect");
 
 /**
  * connect client
  */
-				m_client->connect(host, (uint32_t) port, timeout_ms);
+				m_client->connect(host, (uint32_t) port, timeout_ms, use_encryption);
 				m_client->set_on_disconnection_handler(std::bind(&redis_connection::tcp_client_disconnection_handler, this));
 
 /**

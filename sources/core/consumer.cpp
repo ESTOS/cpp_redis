@@ -69,9 +69,9 @@ namespace cpp_redis {
 	}
 
 	void consumer::connect(const std::string &host, size_t port, const connect_callback_t &connect_callback,
-	                       uint32_t timeout_ms, int32_t max_reconnects, uint32_t reconnect_interval_ms) {
-		m_client->ack_client.connect(host, port, connect_callback, timeout_ms, max_reconnects, reconnect_interval_ms);
-		m_client->poll_client.connect(host, port, connect_callback, timeout_ms, max_reconnects, reconnect_interval_ms);
+	                       uint32_t timeout_ms, int32_t max_reconnects, uint32_t reconnect_interval_ms, bool use_encryption) {
+		m_client->ack_client.connect(host, port, connect_callback, timeout_ms, max_reconnects, reconnect_interval_ms, use_encryption);
+		m_client->poll_client.connect(host, port, connect_callback, timeout_ms, max_reconnects, reconnect_interval_ms, use_encryption);
 	}
 
 	void consumer::auth(const std::string &password,
@@ -82,14 +82,12 @@ namespace cpp_redis {
 
 	consumer &consumer::commit() {
 		while (!is_ready) {
-			if (!is_ready) {
-				std::unique_lock<std::mutex> dispatch_lock(dispatch_queue_changed_mutex);
-				dispatch_queue_changed.wait(dispatch_lock, [&]() {
-						return !dispatch_queue_full.load();
-				});
-				m_read_count = static_cast<int>(m_max_concurrency - m_dispatch_queue->size());
-				poll();
-			}
+            std::unique_lock<std::mutex> dispatch_lock(dispatch_queue_changed_mutex);
+            dispatch_queue_changed.wait(dispatch_lock, [&]() {
+                    return !dispatch_queue_full.load();
+            });
+            m_read_count = static_cast<int>(m_max_concurrency - m_dispatch_queue->size());
+            poll();
 		}
 		return *this;
 	}

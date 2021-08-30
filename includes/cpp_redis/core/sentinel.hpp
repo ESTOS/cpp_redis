@@ -152,7 +152,7 @@ namespace cpp_redis {
 			 * @return current instance
 			 *
 			 */
-			sentinel &add_sentinel(const std::string &host, std::size_t port, std::uint32_t timeout_ms = 0);
+			sentinel &add_sentinel(const std::string &host, std::size_t port, std::uint32_t timeout_ms = 0, bool use_encryption = false);
 
 			/**
 			 * clear all existing sentinels.
@@ -198,13 +198,14 @@ namespace cpp_redis {
 			 * @param port port to be connected to
 			 * @param timeout_ms maximum time to connect
 			 * @param disconnect_handler handler to be called whenever disconnection occurs
+			 * @param use_encryption enables TLS when set to true
 			 *
 			 */
 			void connect(
 					const std::string &host,
 					std::size_t port,
 					const sentinel_disconnect_handler_t &disconnect_handler = nullptr,
-					std::uint32_t timeout_ms = 0);
+					std::uint32_t timeout_ms = 0, bool use_encryption = false);
 
 			/**
 			 * Used to find the current redis master by asking one or more sentinels. Use high availability.
@@ -264,8 +265,8 @@ namespace cpp_redis {
 					 * ctor
 					 *
 					 */
-					sentinel_def(std::string host, std::size_t port, std::uint32_t timeout_ms)
-							: m_host(std::move(host)), m_port(port), m_timeout_ms(timeout_ms) {}
+					sentinel_def(std::string host, std::size_t port, std::uint32_t timeout_ms, bool use_encryption)
+							: m_host(std::move(host)), m_port(port), m_timeout_ms(timeout_ms), m_use_encryption(use_encryption) {}
 
 					/**
 					 * dtor
@@ -303,7 +304,22 @@ namespace cpp_redis {
 					void
 					set_timeout_ms(std::uint32_t timeout_ms) { m_timeout_ms = timeout_ms; }
 
-			private:
+					/**
+					 * @return use_encryption for sentinel
+					 *
+					 */
+                    bool
+                    get_use_encryption() const { return m_use_encryption; }
+
+                    /**
+					 * set use_encryption for sentinel
+					 * @param use_encryption new value
+					 *
+					 */
+                    void
+                    set_use_encryption(bool use_encryption) { m_use_encryption = use_encryption; }
+
+                    private:
 					/**
 					 * sentinel host
 					 *
@@ -321,7 +337,12 @@ namespace cpp_redis {
 					 *
 					 */
 					std::uint32_t m_timeout_ms;
-			};
+                                        /**
+					 * use_encryption config
+					 *
+					 */
+                    bool m_use_encryption;
+                };
 
 	public:
 			/**
