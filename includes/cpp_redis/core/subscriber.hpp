@@ -240,6 +240,17 @@ namespace cpp_redis {
  */
 			subscriber &commit();
 
+/**
+ * Sends a ping to the redis server
+ * The command is not effectively sent immediately, but stored inside an internal buffer until commit() is called.
+ * 
+ * @param message (optional) argument for ping to be returnd as second multi-bulk
+ * @param reply_callback (optional) callback to be called when the anser to the ping is received
+ * @return current instance
+ * 
+ */
+			subscriber& ping(const std::string& message = "", const reply_callback_t& reply_callback = nullptr);
+
 	public:
 /**
  * add a sentinel definition. Required for connect() or get_master_addr_by_name() when autoconnect is enabled.
@@ -329,7 +340,16 @@ namespace cpp_redis {
  */
 			void handle_psubscribe_reply(const std::vector<reply> &reply);
 
+			void handle_ping_reply(const cpp_redis::reply& reply);
+
 /**
+* reset the queue of pending callbacks
+*
+*/
+            void clear_ping_callbacks();
+
+
+                        /**
  * find channel or pattern that is associated to the reply and call its ack callback
  *
  * @param channel channel or pattern that caused the issuance of this reply
@@ -503,6 +523,19 @@ namespace cpp_redis {
  *
  */
 			connect_callback_t m_connect_callback;
+
+/**
+* ping callbacks
+* 
+*/
+			std::queue<reply_callback_t> m_ping_callbacks;
+
+/**
+*  ping callbacks thread safety
+*
+*/
+            std::mutex m_ping_callbacks_mutex;
+
 
 /**
  * sub chans thread safety
