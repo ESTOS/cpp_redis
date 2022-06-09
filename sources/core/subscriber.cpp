@@ -183,7 +183,15 @@ subscriber::client_setname(const std::string& name, const reply_callback_t& repl
 void
 subscriber::disconnect(bool wait_for_removal) {
   __CPP_REDIS_LOG(debug, "cpp_redis::subscriber attempts to disconnect");
+/**
+ * close connection
+ */
   m_client.disconnect(wait_for_removal);
+
+/**
+ * make sure we clear buffer of unanswered callbacks
+ */
+  clear_ping_callbacks();
   __CPP_REDIS_LOG(info, "cpp_redis::subscriber disconnected");
 }
 
@@ -282,6 +290,26 @@ subscriber::commit() {
   return *this;
 }
 
+subscriber& 
+subscriber::ping(const std::string& message, const reply_callback_t& reply_callback) {
+  try {
+    __CPP_REDIS_LOG(debug, "cpp_redis::subscriber attempts to send ping");
+    {
+      std::lock_guard<std::mutex> lock(m_ping_callbacks_mutex);
+      if (message.empty())
+        m_client.send({"PING"});
+      else
+        m_client.send({"PING", message});
+      m_ping_callbacks.push(reply_callback);
+    }
+  }
+  catch (const cpp_redis::redis_error&) {
+    __CPP_REDIS_LOG(error, "cpp_redis::subscriber could not send ping");
+    throw;
+  }
+  return *this;
+}
+
 void
 subscriber::call_acknowledgement_callback(const std::string& channel, const std::map<std::string, callback_holder>& channels, std::mutex& channels_mtx, int64_t nb_chans) {
   std::lock_guard<std::mutex> lock(channels_mtx);
@@ -372,6 +400,73 @@ subscriber::handle_psubscribe_reply(const std::vector<reply>& reply) {
   it->second.subscribe_callback(channel.as_string(), message.as_string());
 }
 
+void 
+subscriber::handle_ping_reply(const cpp_redis::reply& reply) {
+  if (!reply.is_array() || reply.as_array().size() != 2)
+    return;
+
+  const auto& pong    = reply.as_array()[0];
+  const auto& pongmsg = reply.as_array()[1];
+  if (!pong.is_string() || !pongmsg.is_string())
+    return;
+
+  __CPP_REDIS_LOG(debug, "cpp_redis::subscriber received ping reply " + pong.as_string() + " " + pongmsg.as_string());
+
+  reply_callback_t callback = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(m_ping_callbacks_mutex);
+    //m_callbacks_running += 1;
+
+    if (!m_ping_callbacks.empty()) {
+      callback = m_ping_callbacks.front();
+      m_ping_callbacks.pop();
+    }
+  }
+
+  if (callback) {
+    __CPP_REDIS_LOG(debug, "cpp_redis::subscriber executes ping reply callback");
+    cpp_redis::reply replyCopy = reply;
+    callback(replyCopy);
+  }
+
+  //{
+  //  std::lock_guard<std::mutex> lock(m_ping_callbacks_mutex);
+  //  m_callbacks_running -= 1;
+  //  m_sync_condvar.notify_all();
+  //} 
+}
+
+void
+subscriber::clear_ping_callbacks() {
+  if (m_ping_callbacks.empty()) {
+    return;
+  }
+
+  /**
+   * dequeue callbacks and move them to a local variable
+   */
+  std::queue<reply_callback_t> callbacks = std::move(m_ping_callbacks);
+
+  //m_callbacks_running += __CPP_REDIS_LENGTH(callbacks.size());
+
+  std::thread t([=]() mutable {
+    while (!callbacks.empty()) {
+      const auto& callback = callbacks.front();
+
+      if (callback) {
+        reply r = {"network failure", reply::string_type::error};
+        callback(r);
+      }
+
+      //--m_callbacks_running;
+      callbacks.pop();
+    }
+
+    //m_sync_condvar.notify_all();
+  });
+  t.detach();
+}
+
 void
 subscriber::connection_receive_handler(network::redis_connection&, reply& reply) {
   __CPP_REDIS_LOG(info, "cpp_redis::subscriber received reply");
@@ -401,6 +496,7 @@ subscriber::connection_receive_handler(network::redis_connection&, reply& reply)
   //! Array size of 3 -> SUBSCRIBE if array[2] is a string
   //! Array size of 3 -> AKNOWLEDGEMENT if array[2] is an integer
   //! Array size of 4 -> PSUBSCRIBE
+  //! Array size of 2 -> PING if array[0] is "pong"
   //! Otherwise -> unexpected reply
   if (array.size() == 3 && array[2].is_integer())
     handle_acknowledgement_reply(array);
@@ -408,6 +504,8 @@ subscriber::connection_receive_handler(network::redis_connection&, reply& reply)
     handle_subscribe_reply(array);
   else if (array.size() == 4)
     handle_psubscribe_reply(array);
+  else if (array.size() == 2 && array[0].is_string() && array[0].as_string() == "pong")
+    handle_ping_reply(reply);
 }
 
 void
@@ -426,6 +524,10 @@ subscriber::connection_disconnection_handler(network::redis_connection&) {
   if (m_connect_callback) {
     m_connect_callback(m_redis_server, m_redis_port, connect_state::dropped);
   }
+
+  //! Lock the ping callbacks mutex to prevent more ping commands from beiung issued until our reconnect has completed.
+  std::lock_guard<std::mutex> ping_lock_callback(m_ping_callbacks_mutex);
+  clear_ping_callbacks();
 
   //! Lock the callbacks mutex of the base class to prevent more subscriber commands from being issued until our reconnect has completed.
   std::lock_guard<std::mutex> sub_lock_callback(m_subscribed_channels_mutex);
